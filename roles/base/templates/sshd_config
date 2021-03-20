@@ -1,0 +1,10 @@
+# {{ ansible_managed }}
+AuthorizedKeysFile              .ssh/authorized_keys
+ChallengeResponseAuthentication no
+LoginGraceTime                  30
+PasswordAuthentication          no
+PermitRootLogin                 no
+PrintMotd                       no
+PubkeyAuthentication            yes
+Subsystem sftp                  /usr/lib/ssh/sftp-server
+UsePAM                          yes

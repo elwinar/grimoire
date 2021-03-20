@@ -6,3 +6,20 @@
     state: present
   loop:
     - neovim
+    - sudo
+
+- name: configure sshd
+  ansible.builtin.template:
+    src: sshd_config
+    dest: /etc/ssh/sshd_config
+    owner: root
+    group: root
+    mode: "0644"
+    validate: /usr/bin/sshd -f %s -t
+  register: sshd_config
+
+- name: restart sshd
+  ansible.builtin.service:
+    name: sshd
+    state: restarted
+  when: sshd_config.changed
