@@ -1,0 +1,8 @@
+---
+
+- name: install basic tools
+  ansible.builtin.package:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - neovim
