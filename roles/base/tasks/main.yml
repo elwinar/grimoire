@@ -23,3 +23,12 @@
     name: sshd
     state: restarted
   when: sshd_config.changed
+
+- name: configure sudoers
+  ansible.builtin.template:
+    src: sudoers
+    dest: /etc/sudoers
+    owner: root
+    group: root
+    mode: "0644"
+    validate: /usr/sbin/visudo -cf %s
