@@ -41,6 +41,11 @@
     state: restarted
   when: sshd_config.changed
 
+- name: remove sshd short moduli keys
+  ansible.builtin.shell: |
+    awk '$5 >= 3071' /etc/ssh/moduli | tee /etc/ssh/moduli.tmp
+    mv /etc/ssh/moduli.tmp /etc/ssh/moduli
+
 - name: configure sudoers
   ansible.builtin.template:
     src: sudoers
