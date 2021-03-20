@@ -7,6 +7,23 @@
   loop:
     - neovim
     - sudo
+    - fish
+
+- name: create groups
+  ansible.builtin.group:
+    name: "{{ item }}"
+  loop:
+    - wheel
+    - ssh
+
+- name: create user elwinar
+  ansible.builtin.user:
+    name: elwinar
+    shell: /usr/bin/fish
+    groups: wheel,ssh
+    append: true
+    create_home: true
+    state: present
 
 - name: configure sshd
   ansible.builtin.template:
