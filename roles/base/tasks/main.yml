@@ -5,9 +5,11 @@
     name: "{{ item }}"
     state: present
   loop:
-    - neovim
-    - sudo
     - fish
+    - neovim
+    - tree
+
+# Groups and users.
 
 - name: create groups
   ansible.builtin.group:
@@ -25,13 +27,22 @@
     create_home: true
     state: present
 
+# SSH configuration. Obviously already installed for remote machines. Fairly
+# reasonable configuration without pushing too hard on the secure side to keep
+# things simple.
+
+- name: install sshd
+  ansible.builtin.package:
+    name: openssh
+    state: present
+
 - name: configure sshd
   ansible.builtin.template:
-    src: sshd_config
+    src: etc/ssh/sshd_config
     dest: /etc/ssh/sshd_config
     owner: root
     group: root
-    mode: "0644"
+    mode: 0644
     validate: /usr/bin/sshd -f %s -t
   register: sshd_config
 
@@ -46,11 +57,90 @@
     awk '$5 >= 3071' /etc/ssh/moduli | tee /etc/ssh/moduli.tmp
     mv /etc/ssh/moduli.tmp /etc/ssh/moduli
 
+- name: ensure ssh is started on boot
+  ansible.builtin.service:
+    name: sshd
+    enabled: true
+    state: started
+
+# Sudo configuration. Only the wheel group is allowed to use sudo or su.
+
+- name: install sshd
+  ansible.builtin.package:
+    name: sudo
+    state: present
+
 - name: configure sudoers
   ansible.builtin.template:
-    src: sudoers
+    src: etc/sudoers
     dest: /etc/sudoers
     owner: root
     group: root
-    mode: "0644"
+    mode: 0440
     validate: /usr/sbin/visudo -cf %s
+
+- name: restrict su access
+  ansible.builtin.template:
+    src: etc/pam.d/su
+    dest: /etc/pam.d/su
+    owner: root
+    group: root
+    mode: 0644
+
+# NTP configuration.
+
+- name: install ntp
+  ansible.builtin.package:
+    name: ntp
+    state: present
+
+- name: configure ntp
+  ansible.builtin.template:
+    src: etc/ntp.conf
+    dest: /etc/ntp.conf
+    owner: root
+    group: root
+    mode: 0644
+  register: ntp_config
+
+- name: restart ntp
+  ansible.builtin.service:
+    name: ntpd
+    state: restarted
+  when: ntp_config.changed
+
+- name: ensure ntp is started on boot
+  ansible.builtin.service:
+    name: ntpd
+    enabled: true
+    state: started
+
+# RNG Tools configuration. As a headless server doesn't have a keyboard or
+# pointer device, there is next to no fast source of randomness available.
+# rng-tools is a solution for that.
+
+- name: install rng-tools
+  ansible.builtin.package:
+    name: rng-tools
+    state: present
+
+- name: configure rng-tools
+  ansible.builtin.template:
+    src: etc/default/rng-tools
+    dest: /etc/default/rng-tools
+    owner: root
+    group: root
+    mode: 0640
+  register: rng_tools_config
+
+- name: restart rng-tools
+  ansible.builtin.service:
+    name: rngd
+    state: restarted
+  when: rng_tools_config.changed
+
+- name: ensure rng-tools is started on boot
+  ansible.builtin.service:
+    name: rngd
+    enabled: true
+    state: started

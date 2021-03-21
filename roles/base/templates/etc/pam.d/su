@@ -1,0 +1,8 @@
+# {{ ansible_managed }}
+#%PAM-1.0
+auth            sufficient      pam_rootok.so
+# require a user to be in the "wheel" group to use su
+auth            required        pam_wheel.so use_uid
+auth            required        pam_unix.so
+account         required        pam_unix.so
+session         required        pam_unix.so
