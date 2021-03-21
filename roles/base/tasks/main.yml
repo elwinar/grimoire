@@ -144,3 +144,48 @@
     name: rngd
     enabled: true
     state: started
+
+# UFW configuration. Deny all incoming or outgoing traffic except for SSH,
+# DNS, and NTP. Other roles are expected to add their own rules on top of this
+# to allow their traffic.
+
+- name: install ufw
+  ansible.builtin.package:
+    name: ufw
+    state: present
+
+- name: ensure ufw is started on boot
+  ansible.builtin.service:
+    name: ufw
+    enabled: true
+    state: started
+
+- name: reset ufw configuration
+  community.general.ufw:
+    state: reset
+
+- name: deny all traffic by default
+  community.general.ufw:
+    default: deny
+
+- name: allow SSH in
+  community.general.ufw:
+    rule: limit
+    port: 22
+    direction: in
+
+- name: allow NTP out
+  community.general.ufw:
+    rule: allow
+    port: 123
+    direction: out
+
+- name: allow DNS out
+  community.general.ufw:
+    rule: allow
+    port: 53
+    direction: out
+
+- name: enable ufw
+  community.general.ufw:
+    state: enabled
