@@ -3,3 +3,4 @@
 - hosts: vimes
   roles:
     - base
+    - http

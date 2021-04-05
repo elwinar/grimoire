@@ -1,227 +1,222 @@
 ---
 
-- name: update the package cache
-  community.general.pacman:
-    update_cache: true
+- name: Upgrading packages versions
+  block:
+    - name: update the package cache
+      community.general.pacman:
+        update_cache: true
 
-- name: upgrade the packages
-  community.general.pacman:
-    upgrade: true
+    - name: upgrade the packages
+      community.general.pacman:
+        upgrade: true
 
-- name: install basic tools
-  community.general.pacman:
-    name:
-      - fish
-      - neovim
-      - tree
-    state: present
+    - name: install basic tools
+      community.general.pacman:
+        name:
+          - fish
+          - neovim
+          - tree
+        state: present
 
-# Groups and users.
+- name: Create groups and users
+  block:
+    - name: create groups
+      ansible.builtin.group:
+        name: "{{ item }}"
+      loop:
+        - wheel
+        - ssh
 
-- name: create groups
-  ansible.builtin.group:
-    name: "{{ item }}"
-  loop:
-    - wheel
-    - ssh
+    - name: create user elwinar
+      ansible.builtin.user:
+        name: elwinar
+        shell: /usr/bin/fish
+        groups: wheel,ssh
+        append: true
+        create_home: true
+        state: present
 
-- name: create user elwinar
-  ansible.builtin.user:
-    name: elwinar
-    shell: /usr/bin/fish
-    groups: wheel,ssh
-    append: true
-    create_home: true
-    state: present
+- name: Remote shell access
+  block:
+    - name: install sshd
+      community.general.pacman:
+        name: openssh
+        state: present
 
-# SSH configuration. Obviously already installed for remote machines. Fairly
-# reasonable configuration without pushing too hard on the secure side to keep
-# things simple.
+    - name: configure sshd
+      ansible.builtin.template:
+        src: etc/ssh/sshd_config
+        dest: /etc/ssh/sshd_config
+        owner: root
+        group: root
+        mode: 0644
+        validate: /usr/bin/sshd -f %s -t
+      register: sshd_config
 
-- name: install sshd
-  community.general.pacman:
-    name: openssh
-    state: present
+    - name: restart sshd
+      ansible.builtin.service:
+        name: sshd
+        state: restarted
+      when: sshd_config.changed
 
-- name: configure sshd
-  ansible.builtin.template:
-    src: etc/ssh/sshd_config
-    dest: /etc/ssh/sshd_config
-    owner: root
-    group: root
-    mode: 0644
-    validate: /usr/bin/sshd -f %s -t
-  register: sshd_config
+    - name: remove sshd short moduli keys
+      ansible.builtin.shell: |
+        awk '$5 >= 3071' /etc/ssh/moduli | tee /etc/ssh/moduli.tmp
+        mv /etc/ssh/moduli.tmp /etc/ssh/moduli
 
-- name: restart sshd
-  ansible.builtin.service:
-    name: sshd
-    state: restarted
-  when: sshd_config.changed
+    - name: ensure ssh is started on boot
+      ansible.builtin.service:
+        name: sshd
+        enabled: true
+        state: started
 
-- name: remove sshd short moduli keys
-  ansible.builtin.shell: |
-    awk '$5 >= 3071' /etc/ssh/moduli | tee /etc/ssh/moduli.tmp
-    mv /etc/ssh/moduli.tmp /etc/ssh/moduli
+- name: Privilege escalation
+  block:
+    - name: install sudo
+      community.general.pacman:
+        name: sudo
+        state: present
 
-- name: ensure ssh is started on boot
-  ansible.builtin.service:
-    name: sshd
-    enabled: true
-    state: started
+    - name: configure sudoers
+      ansible.builtin.template:
+        src: etc/sudoers
+        dest: /etc/sudoers
+        owner: root
+        group: root
+        mode: 0440
+        validate: /usr/sbin/visudo -cf %s
 
-# Sudo configuration. Only the wheel group is allowed to use sudo or su.
+    - name: restrict su access
+      ansible.builtin.template:
+        src: etc/pam.d/su
+        dest: /etc/pam.d/su
+        owner: root
+        group: root
+        mode: 0644
 
-- name: install sshd
-  community.general.pacman:
-    name: sudo
-    state: present
+- name: Keep time in sync
+  block:
+    - name: install ntp
+      community.general.pacman:
+        name: ntp
+        state: present
 
-- name: configure sudoers
-  ansible.builtin.template:
-    src: etc/sudoers
-    dest: /etc/sudoers
-    owner: root
-    group: root
-    mode: 0440
-    validate: /usr/sbin/visudo -cf %s
+    - name: configure ntp
+      ansible.builtin.template:
+        src: etc/ntp.conf
+        dest: /etc/ntp.conf
+        owner: root
+        group: root
+        mode: 0644
+      register: ntp_config
 
-- name: restrict su access
-  ansible.builtin.template:
-    src: etc/pam.d/su
-    dest: /etc/pam.d/su
-    owner: root
-    group: root
-    mode: 0644
+    - name: restart ntp
+      ansible.builtin.service:
+        name: ntpd
+        state: restarted
+      when: ntp_config.changed
 
-# NTP configuration.
+    - name: ensure ntp is started on boot
+      ansible.builtin.service:
+        name: ntpd
+        enabled: true
+        state: started
 
-- name: install ntp
-  community.general.pacman:
-    name: ntp
-    state: present
+- name: Improve sources of randomness
+  block:
+    - name: install rng-tools
+      community.general.pacman:
+        name: rng-tools
+        state: present
 
-- name: configure ntp
-  ansible.builtin.template:
-    src: etc/ntp.conf
-    dest: /etc/ntp.conf
-    owner: root
-    group: root
-    mode: 0644
-  register: ntp_config
+    - name: configure rng-tools
+      ansible.builtin.template:
+        src: etc/default/rng-tools
+        dest: /etc/default/rng-tools
+        owner: root
+        group: root
+        mode: 0640
+      register: rng_tools_config
 
-- name: restart ntp
-  ansible.builtin.service:
-    name: ntpd
-    state: restarted
-  when: ntp_config.changed
+    - name: restart rng-tools
+      ansible.builtin.service:
+        name: rngd
+        state: restarted
+      when: rng_tools_config.changed
 
-- name: ensure ntp is started on boot
-  ansible.builtin.service:
-    name: ntpd
-    enabled: true
-    state: started
+    - name: ensure rng-tools is started on boot
+      ansible.builtin.service:
+        name: rngd
+        enabled: true
+        state: started
 
-# RNG Tools configuration. As a headless server doesn't have a keyboard or
-# pointer device, there is next to no fast source of randomness available.
-# rng-tools is a solution for that.
+- name: Firewall configuration
+  block:
+    - name: install ufw
+      community.general.pacman:
+        name: ufw
+        state: present
 
-- name: install rng-tools
-  community.general.pacman:
-    name: rng-tools
-    state: present
+    - name: ensure ufw is started on boot
+      ansible.builtin.service:
+        name: ufw
+        enabled: true
+        state: started
 
-- name: configure rng-tools
-  ansible.builtin.template:
-    src: etc/default/rng-tools
-    dest: /etc/default/rng-tools
-    owner: root
-    group: root
-    mode: 0640
-  register: rng_tools_config
+    - name: reset ufw configuration
+      community.general.ufw:
+        state: reset
 
-- name: restart rng-tools
-  ansible.builtin.service:
-    name: rngd
-    state: restarted
-  when: rng_tools_config.changed
+    - name: deny all traffic by default
+      community.general.ufw:
+        default: deny
 
-- name: ensure rng-tools is started on boot
-  ansible.builtin.service:
-    name: rngd
-    enabled: true
-    state: started
+    - name: allow SSH in
+      community.general.ufw:
+        rule: limit
+        port: 22
+        direction: in
 
-# UFW configuration. Deny all incoming or outgoing traffic except for SSH,
-# DNS, and NTP. Other roles are expected to add their own rules on top of this
-# to allow their traffic.
+    - name: allow NTP out
+      community.general.ufw:
+        rule: allow
+        port: 123
+        direction: out
 
-- name: install ufw
-  community.general.pacman:
-    name: ufw
-    state: present
+    - name: allow DNS out
+      community.general.ufw:
+        rule: allow
+        port: 53
+        direction: out
 
-- name: ensure ufw is started on boot
-  ansible.builtin.service:
-    name: ufw
-    enabled: true
-    state: started
+    - name: enable ufw
+      community.general.ufw:
+        state: enabled
 
-- name: reset ufw configuration
-  community.general.ufw:
-    state: reset
+- name: Protect against brute-force intrusions
+  block:
+    - name: install fail2ban
+      community.general.pacman:
+        name: fail2ban
+        state: present
 
-- name: deny all traffic by default
-  community.general.ufw:
-    default: deny
+    - name: ensure fail2ban is started on boot
+      ansible.builtin.service:
+        name: fail2ban
+        enabled: true
+        state: started
 
-- name: allow SSH in
-  community.general.ufw:
-    rule: limit
-    port: 22
-    direction: in
+    - name: configure fail2ban
+      ansible.builtin.template:
+        src: etc/fail2ban/jail.local
+        dest: /etc/fail2ban/jail.local
+        owner: root
+        group: root
+        mode: 0640
+      register: fail2ban_config
 
-- name: allow NTP out
-  community.general.ufw:
-    rule: allow
-    port: 123
-    direction: out
-
-- name: allow DNS out
-  community.general.ufw:
-    rule: allow
-    port: 53
-    direction: out
-
-- name: enable ufw
-  community.general.ufw:
-    state: enabled
-
-# fail2ban bans IP exhibiting suspicous behaviors, like password failures,
-# exploit scanning, etc.
-
-- name: install fail2ban
-  community.general.pacman:
-    name: fail2ban
-    state: present
-
-- name: ensure fail2ban is started on boot
-  ansible.builtin.service:
-    name: fail2ban
-    enabled: true
-    state: started
-
-- name: configure fail2ban
-  ansible.builtin.template:
-    src: etc/fail2ban/jail.local
-    dest: /etc/fail2ban/jail.local
-    owner: root
-    group: root
-    mode: 0640
-  register: fail2ban_config
-
-- name: restart fail2ban
-  ansible.builtin.service:
-    name: fail2ban
-    state: restarted
-  when: fail2ban_config.changed
+    - name: restart fail2ban
+      ansible.builtin.service:
+        name: fail2ban
+        state: restarted
+      when: fail2ban_config.changed
