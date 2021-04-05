@@ -1,0 +1,7 @@
+# {{ ansible_managed }}
+
+[DEFAULT]
+banaction = ufw
+
+[sshd]
+enabled = true

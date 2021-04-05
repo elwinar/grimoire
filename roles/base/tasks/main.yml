@@ -1,13 +1,20 @@
 ---
 
+- name: update the package cache
+  community.general.pacman:
+    update_cache: true
+
+- name: upgrade the packages
+  community.general.pacman:
+    upgrade: true
+
 - name: install basic tools
-  ansible.builtin.package:
-    name: "{{ item }}"
+  community.general.pacman:
+    name:
+      - fish
+      - neovim
+      - tree
     state: present
-  loop:
-    - fish
-    - neovim
-    - tree
 
 # Groups and users.
 
@@ -32,7 +39,7 @@
 # things simple.
 
 - name: install sshd
-  ansible.builtin.package:
+  community.general.pacman:
     name: openssh
     state: present
 
@@ -66,7 +73,7 @@
 # Sudo configuration. Only the wheel group is allowed to use sudo or su.
 
 - name: install sshd
-  ansible.builtin.package:
+  community.general.pacman:
     name: sudo
     state: present
 
@@ -90,7 +97,7 @@
 # NTP configuration.
 
 - name: install ntp
-  ansible.builtin.package:
+  community.general.pacman:
     name: ntp
     state: present
 
@@ -120,7 +127,7 @@
 # rng-tools is a solution for that.
 
 - name: install rng-tools
-  ansible.builtin.package:
+  community.general.pacman:
     name: rng-tools
     state: present
 
@@ -150,7 +157,7 @@
 # to allow their traffic.
 
 - name: install ufw
-  ansible.builtin.package:
+  community.general.pacman:
     name: ufw
     state: present
 
@@ -189,3 +196,32 @@
 - name: enable ufw
   community.general.ufw:
     state: enabled
+
+# fail2ban bans IP exhibiting suspicous behaviors, like password failures,
+# exploit scanning, etc.
+
+- name: install fail2ban
+  community.general.pacman:
+    name: fail2ban
+    state: present
+
+- name: ensure fail2ban is started on boot
+  ansible.builtin.service:
+    name: fail2ban
+    enabled: true
+    state: started
+
+- name: configure fail2ban
+  ansible.builtin.template:
+    src: etc/fail2ban/jail.local
+    dest: /etc/fail2ban/jail.local
+    owner: root
+    group: root
+    mode: 0640
+  register: fail2ban_config
+
+- name: restart fail2ban
+  ansible.builtin.service:
+    name: fail2ban
+    state: restarted
+  when: fail2ban_config.changed
