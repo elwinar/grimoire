@@ -2,5 +2,7 @@
 
 - hosts: vimes
   roles:
-    - base
-    - http
+    - role: base
+      tags: base
+    - role: http
+      tags: http

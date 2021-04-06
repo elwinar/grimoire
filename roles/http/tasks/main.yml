@@ -1,0 +1,29 @@
+---
+
+- name: http server
+  block:
+    - name: install caddy
+      community.general.pacman:
+        name: caddy
+        state: present
+
+    - name: configure caddy
+      ansible.builtin.template:
+        src: etc/caddy/Caddyfile
+        dest: /etc/caddy/Caddyfile
+        owner: root
+        group: root
+        mode: 0644
+      register: caddy_config
+
+    - name: restart caddy
+      ansible.builtin.service:
+        name: caddy
+        state: restarted
+      when: caddy_config.changed
+
+    - name: ensure caddy is started on boot
+      ansible.builtin.service:
+        name: caddy
+        enabled: true
+        state: started
