@@ -1,0 +1,34 @@
+---
+
+- name: gitea server
+  block:
+    - name: install gitea
+      community.general.pacman:
+        name: gitea
+        state: present
+
+    - name: ensure gitea is started on boot
+      ansible.builtin.service:
+        name: gitea
+        enabled: true
+        state: started
+
+    - name: allow gitea traffic
+      community.general.ufw:
+        rule: allow
+        port: 3000
+
+    - name: configure gitea
+      ansible.builtin.template:
+        src: etc/gitea/conf/app.ini
+        dest: /etc/gitea/conf/app.ini
+        owner: root
+        group: root
+        mode: 0640
+      register: gitea_config
+
+    - name: restart gitea
+      ansible.builtin.service:
+        name: gitea
+        state: restarted
+      when: gitea_config.changed

@@ -6,3 +6,5 @@
       tags: base
     - role: http
       tags: http
+    - role: gitea
+      tags: gitea
