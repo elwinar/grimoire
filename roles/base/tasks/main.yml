@@ -60,9 +60,10 @@
       when: sshd_config.changed
 
     - name: remove sshd short moduli keys
-      ansible.builtin.shell: |
-        awk '$5 >= 3071' /etc/ssh/moduli | tee /etc/ssh/moduli.tmp
-        mv /etc/ssh/moduli.tmp /etc/ssh/moduli
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/moduli
+        state: absent
+        regexp: '^(\w+ ){4}[12].*'
 
     - name: ensure ssh is started on boot
       ansible.builtin.service:
