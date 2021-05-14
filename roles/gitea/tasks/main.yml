@@ -1,0 +1,64 @@
+---
+
+- name: gitea server
+  block:
+    - name: install gitea
+      community.general.pacman:
+        name: gitea
+        state: present
+
+    - name: ensure gitea is started on boot
+      ansible.builtin.service:
+        name: gitea
+        enabled: true
+        state: started
+
+    - name: allow gitea traffic
+      community.general.ufw:
+        rule: allow
+        port: 3000
+
+    - name: allow gitea SMTP traffic
+      community.general.ufw:
+        rule: allow
+        port: 465
+        direction: out
+
+    - name: create user gitea
+      ansible.builtin.user:
+        name: gitea
+        shell: /usr/bin/sh
+        groups: ssh
+        append: true
+        create_home: false
+        state: present
+
+    - name: configure gitea
+      ansible.builtin.template:
+        src: etc/gitea/app.ini
+        dest: /etc/gitea/app.ini
+        owner: gitea
+        group: gitea
+        mode: 0640
+      register: gitea_config
+
+    - name: restart gitea
+      ansible.builtin.service:
+        name: gitea
+        state: restarted
+      when: gitea_config.changed
+
+    - name: configure the caddy proxy
+      ansible.builtin.template:
+        src: etc/caddy/conf.d/gitea.conf
+        dest: /etc/caddy/conf.d/gitea.conf
+        owner: root
+        group: caddy
+        mode: 0640
+      register: gitea_http_config
+
+    - name: reload the caddy configuration
+      ansible.builtin.service:
+        name: caddy
+        state: reloaded
+      when: gitea_http_config.changed
