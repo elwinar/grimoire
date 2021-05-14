@@ -2,5 +2,9 @@
 
 - hosts: vimes
   roles:
-    - base
-    - http
+    - role: base
+      tags: base
+    - role: caddy
+      tags: caddy
+    - role: gitea
+      tags: gitea

@@ -1,0 +1,11 @@
+---
+data_path: /var/lib/gitea
+domain: gitea.elwinar.com
+internal_token: "{{ gitea_internal_token }}"
+local_port: 3000
+log_path: /var/log/gitea
+mailer_host: ssl0.ovh.net:465
+mailer_password: "{{ gitea_mailer_password }}"
+mailer_user: gitea@elwinar.com
+run_user: gitea
+secret_key: "{{ gitea_secret_key }}"
